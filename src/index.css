@@ -1,0 +1,9 @@
+/* Base UI: keep portaled popups (dialogs, popovers) above the page */
+#root {
+  isolation: isolate;
+}
+
+/* Base UI: lets backdrops cover the visual viewport on iOS 26+ Safari */
+body {
+  position: relative;
+}
