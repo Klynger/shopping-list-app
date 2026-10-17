@@ -1,32 +1,38 @@
-# React + TypeScript + Vite
+# Shopping List app
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The web client for [sl-api](https://github.com/Klynger/sl-api): a mobile-first React app for shared shopping lists. People create groups, invite others by username, and keep lists of products from a shared catalog that everyone in the group can check off while shopping.
 
-Currently, two official plugins are available:
+Built with React 19, TypeScript, Vite, [Base UI](https://base-ui.com), TanStack Query and React Router. The UI is available in English and Brazilian Portuguese.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Running locally
 
-## React Compiler
+The app needs the API running. From the `sl-api` checkout:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+docker compose up --build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+That starts Postgres, runs migrations, serves the API on port 8080 and seeds test users (see `cmd/seed` in sl-api for their credentials).
+
+Then, in this repo:
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Open http://localhost:5173. The dev server proxies `/v1` to the API, which keeps the session cookie same-origin (the API sends no CORS headers). Point it at another API with `API_URL=http://host:port pnpm dev`.
+
+The pnpm version is pinned in `package.json` (`packageManager`). With [Volta](https://volta.sh), `volta install pnpm@<that version>` gets the right one.
+
+## Scripts
+
+- `pnpm dev`: start the dev server
+- `pnpm build`: typecheck and build for production
+- `pnpm lint`: run oxlint
+
+## Translations
+
+All UI text lives in `src/i18n/messages.ts`. The Portuguese dictionary is typed against the English one, so a missing or renamed key fails the build. The language follows the browser on first visit and can be changed from the header, and the choice is remembered on the device.
+
+API error text is English only, so errors are translated from their stable `code` (see `errors.codes` in the messages file), with a generic fallback for codes that have no message yet.
