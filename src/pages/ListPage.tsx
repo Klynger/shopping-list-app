@@ -1,6 +1,6 @@
 import { Menu } from '@base-ui/react/menu'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRef, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 
 import * as api from '../api/endpoints.ts'
@@ -71,6 +71,20 @@ function Items({ listId }: { listId: string }) {
   const items = useQuery({ queryKey: api.queryKeys.listItems(listId), queryFn: () => api.listItems(listId) })
   const products = useQuery({ queryKey: api.queryKeys.products, queryFn: api.listProducts })
   const [adding, setAdding] = useState(false)
+  const [failure, setFailure] = useState<{ itemId: string; message: string } | null>(null)
+
+  // Item actions can unmount their row (checking moves it between sections,
+  // removing deletes it), so outcomes are reported up here instead of per row.
+  const reportOutcome = useCallback<OutcomeHandler>(
+    (item, error) => {
+      if (error) {
+        setFailure({ itemId: item.id, message: `${item.productName}: ${formatError(error)}` })
+      } else {
+        setFailure((current) => (current?.itemId === item.id ? null : current))
+      }
+    },
+    [formatError],
+  )
 
   const productUnits = new Map(products.data?.map((product) => [product.id, product.predefinedUnit]))
   const remaining = items.data?.filter((item) => item.status === 'pending' || item.status === 'in_cart') ?? []
@@ -86,7 +100,7 @@ function Items({ listId }: { listId: string }) {
         <ErrorText error={items.error ? formatError(items.error) : null} />
         {items.data && items.data.length === 0 ? <EmptyState>{t.list.empty}</EmptyState> : null}
         {items.data && items.data.length > 0 && remaining.length === 0 ? <EmptyState>{t.list.allDone}</EmptyState> : null}
-        <ItemList listId={listId} items={remaining} productUnits={productUnits} />
+        <ItemList listId={listId} items={remaining} productUnits={productUnits} onOutcome={reportOutcome} />
       </section>
 
       {done.length > 0 ? (
@@ -94,11 +108,19 @@ function Items({ listId }: { listId: string }) {
           <h2>
             {t.list.done} <span className="count">{done.length}</span>
           </h2>
-          <ItemList listId={listId} items={done} productUnits={productUnits} />
+          <ItemList listId={listId} items={done} productUnits={productUnits} onOutcome={reportOutcome} />
         </section>
       ) : null}
 
       <div className="bottom-bar">
+        {failure ? (
+          <div className="action-error" role="alert">
+            <span>{failure.message}</span>
+            <Button variant="ghost" size="sm" onClick={() => setFailure(null)}>
+              {t.common.dismiss}
+            </Button>
+          </div>
+        ) : null}
         <Button className="bottom-bar-button" onClick={() => setAdding(true)}>
           <PlusIcon />
           {t.list.addItems}
@@ -120,32 +142,50 @@ function ItemList({
   listId,
   items,
   productUnits,
+  onOutcome,
 }: {
   listId: string
   items: api.ListItem[]
   productUnits: Map<string, string>
+  onOutcome: OutcomeHandler
 }) {
   if (items.length === 0) return null
 
   return (
     <ul className="card item-list">
       {items.map((item) => (
-        <ItemRow key={item.id} listId={listId} item={item} unit={item.unit || productUnits.get(item.productId) || ''} />
+        <ItemRow
+          key={item.id}
+          listId={listId}
+          item={item}
+          unit={item.unit || productUnits.get(item.productId) || ''}
+          onOutcome={onOutcome}
+        />
       ))}
     </ul>
   )
 }
 
-function ItemRow({ listId, item, unit }: { listId: string; item: api.ListItem; unit: string }) {
-  const { t, formatError } = useI18n()
-  const action = useItemAction(listId)
+function ItemRow({
+  listId,
+  item,
+  unit,
+  onOutcome,
+}: {
+  listId: string
+  item: api.ListItem
+  unit: string
+  onOutcome: OutcomeHandler
+}) {
+  const { t } = useI18n()
+  const action = useItemAction(listId, onOutcome)
   const [editing, setEditing] = useState(false)
   const isBought = item.status === 'purchased'
   const showStatus = item.status === 'in_cart' || item.status === 'cancelled'
 
   function setStatus(status: api.ItemStatus) {
     action.mutate({
-      itemId: item.id,
+      item,
       run: () => api.updateItemStatus(listId, item.id, status),
       optimistic: (current) => ({ ...current, status }),
     })
@@ -181,7 +221,7 @@ function ItemRow({ listId, item, unit }: { listId: string; item: api.ListItem; u
           disabled={item.quantity <= 1}
           onClick={() =>
             action.mutate({
-              itemId: item.id,
+              item,
               run: () => api.decrementItem(listId, item.id),
               optimistic: (current) => ({ ...current, quantity: Math.max(1, current.quantity - 1) }),
             })
@@ -199,7 +239,7 @@ function ItemRow({ listId, item, unit }: { listId: string; item: api.ListItem; u
           aria-label={t.list.increase}
           onClick={() =>
             action.mutate({
-              itemId: item.id,
+              item,
               run: () => api.incrementItem(listId, item.id),
               optimistic: (current) => ({ ...current, quantity: current.quantity + 1 }),
             })
@@ -213,14 +253,8 @@ function ItemRow({ listId, item, unit }: { listId: string; item: api.ListItem; u
         item={item}
         onStatusChange={setStatus}
         onEdit={() => setEditing(true)}
-        onRemove={() => action.mutate({ itemId: item.id, run: () => api.deleteItem(listId, item.id), optimistic: () => null })}
+        onRemove={() => action.mutate({ item, run: () => api.deleteItem(listId, item.id), optimistic: () => null })}
       />
-
-      {action.error ? (
-        <div className="item-error">
-          <ErrorText error={formatError(action.error)} />
-        </div>
-      ) : null}
 
       <EditItemModal listId={listId} item={item} open={editing} onOpenChange={setEditing} />
     </li>
@@ -293,53 +327,65 @@ function EditItemModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const { t } = useI18n()
+
+  // The popup unmounts while closed, so the form inside starts fresh from the
+  // item every time it opens.
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={t.list.editTitle(item.productName)}>
+      <EditItemForm listId={listId} item={item} onDone={() => onOpenChange(false)} />
+    </Modal>
+  )
+}
+
+function EditItemForm({ listId, item, onDone }: { listId: string; item: api.ListItem; onDone: () => void }) {
   const { t, formatError } = useI18n()
   const queryClient = useQueryClient()
+  const [initial] = useState(item)
   const [quantity, setQuantity] = useState(String(item.quantity))
   const [unit, setUnit] = useState(item.unit)
   const [note, setNote] = useState(item.note)
   const save = useMutation({
-    mutationFn: () => api.updateItem(listId, item.id, { quantity: Number(quantity), unit: unit.trim(), note: note.trim() }),
+    mutationFn: (form: api.UpdateItemForm) => api.updateItem(listId, item.id, form),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: api.queryKeys.listItems(listId) })
-      onOpenChange(false)
+      onDone()
     },
   })
 
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setQuantity(String(item.quantity))
-      setUnit(item.unit)
-      setNote(item.note)
-      save.reset()
-    }
-    onOpenChange(next)
-  }
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    save.mutate()
+    // Send only what the user changed, so a quantity someone else bumped while
+    // this was open is not overwritten with the value it opened with.
+    const form: api.UpdateItemForm = {}
+    if (Number(quantity) !== initial.quantity) form.quantity = Number(quantity)
+    if (unit.trim() !== initial.unit) form.unit = unit.trim()
+    if (note.trim() !== initial.note) form.note = note.trim()
+
+    if (Object.keys(form).length === 0) {
+      onDone()
+      return
+    }
+    save.mutate(form)
   }
 
   return (
-    <Modal open={open} onOpenChange={handleOpenChange} title={t.list.editTitle(item.productName)}>
-      <form className="stack" onSubmit={handleSubmit}>
-        <div className="field-row">
-          <TextField label={t.list.quantity} type="number" min={1} value={quantity} onChange={setQuantity} required />
-          <TextField label={t.list.unit} placeholder={t.list.unitPlaceholder} value={unit} onChange={setUnit} />
-        </div>
-        <TextField label={t.list.note} placeholder={t.list.notePlaceholder} value={note} onChange={setNote} />
-        <ErrorText error={save.error ? formatError(save.error) : null} />
-        <div className="dialog-actions">
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            {t.common.cancel}
-          </Button>
-          <Button type="submit" disabled={save.isPending || Number(quantity) < 1}>
-            {t.common.save}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <form className="stack" onSubmit={handleSubmit}>
+      <div className="field-row">
+        <TextField label={t.list.quantity} type="number" min={1} value={quantity} onChange={setQuantity} required />
+        <TextField label={t.list.unit} placeholder={t.list.unitPlaceholder} value={unit} onChange={setUnit} />
+      </div>
+      <TextField label={t.list.note} placeholder={t.list.notePlaceholder} value={note} onChange={setNote} />
+      <ErrorText error={save.error ? formatError(save.error) : null} />
+      <div className="dialog-actions">
+        <Button type="button" variant="secondary" onClick={onDone}>
+          {t.common.cancel}
+        </Button>
+        <Button type="submit" disabled={save.isPending || Number(quantity) < 1}>
+          {t.common.save}
+        </Button>
+      </div>
+    </form>
   )
 }
 
@@ -359,6 +405,28 @@ function AddItemsSheet({
   onOpenChange: (open: boolean) => void
   items: api.ListItem[]
   products: api.Product[]
+}) {
+  const { t } = useI18n()
+
+  // Like the edit form, the panel mounts on each open, so the search and any
+  // earlier error start clear.
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={t.list.sheetTitle} className="sheet-tall">
+      <AddItemsPanel listId={listId} items={items} products={products} onClose={() => onOpenChange(false)} />
+    </Modal>
+  )
+}
+
+function AddItemsPanel({
+  listId,
+  items,
+  products,
+  onClose,
+}: {
+  listId: string
+  items: api.ListItem[]
+  products: api.Product[]
+  onClose: () => void
 }) {
   const { t, formatError } = useI18n()
   const queryClient = useQueryClient()
@@ -387,12 +455,19 @@ function AddItemsSheet({
       if ('productId' in target) {
         productId = target.productId
       } else {
+        // Creating a product returns no body yet, so the new one is found by
+        // diffing fresh catalogs from before and after the create. Use the id
+        // from the create response once sl-api returns the product.
+        const fetchCatalog = () =>
+          queryClient.fetchQuery({ queryKey: api.queryKeys.products, queryFn: api.listProducts, staleTime: 0 })
+        const knownIds = new Set((await fetchCatalog()).map((product) => product.id))
         await api.createProduct({ name: target.newProductName, description: '', predefinedUnit: '' })
-        // Creating a product returns no body, so find the new one in a fresh catalog.
-        const fresh = await queryClient.fetchQuery({ queryKey: api.queryKeys.products, queryFn: api.listProducts, staleTime: 0 })
-        const created = fresh.findLast((product) => product.name === target.newProductName && !onList.has(product.id))
-        if (!created) throw new Error('created product not found')
-        productId = created.id
+        const created = (await fetchCatalog()).filter(
+          (product) => product.name === target.newProductName && !knownIds.has(product.id),
+        )
+        // Someone else creating the same name at the same moment makes it ambiguous.
+        if (created.length !== 1) throw new Error('could not identify the created product')
+        productId = created[0].id
       }
       await api.addItem(listId, { productId })
       return productId
@@ -404,15 +479,6 @@ function AddItemsSheet({
       await queryClient.invalidateQueries({ queryKey: api.queryKeys.listItems(listId) })
     },
   })
-
-  function handleOpenChange(next: boolean) {
-    if (next) {
-      setQuery('')
-      setJustAdded(null)
-      add.reset()
-    }
-    onOpenChange(next)
-  }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
@@ -427,7 +493,7 @@ function AddItemsSheet({
   }
 
   return (
-    <Modal open={open} onOpenChange={handleOpenChange} title={t.list.sheetTitle} className="sheet-tall">
+    <>
       <form className="sheet-search" onSubmit={handleSubmit}>
         <label className="visually-hidden" htmlFor="add-items-search">
           {t.list.searchLabel}
@@ -495,23 +561,25 @@ function AddItemsSheet({
       </ul>
 
       {products.length === 0 && !trimmed ? <EmptyState>{t.list.noProducts}</EmptyState> : null}
-      {products.length > 0 && matches.length === 0 && !trimmed ? <EmptyState>{t.list.noMatches}</EmptyState> : null}
 
       <div className="dialog-actions">
-        <Button variant="secondary" onClick={() => onOpenChange(false)}>
+        <Button variant="secondary" onClick={onClose}>
           {t.list.closeSheet}
         </Button>
       </div>
-    </Modal>
+    </>
   )
 }
 
 /**
  * Runs one item operation, showing its result in the list right away and
  * rolling back if the server refuses. Taps can overlap (pressing + three times
- * fast), so the list is re-read from the server only once the last one settles.
+ * fast), so a failure only restores its own item, and the list is re-read from
+ * the server once the last one settles. Overlapping taps on the same item are
+ * not merged: if the first fails, its restore hides the later ones until that
+ * final re-read.
  */
-function useItemAction(listId: string) {
+function useItemAction(listId: string, onOutcome: OutcomeHandler) {
   const queryClient = useQueryClient()
   const queryKey = api.queryKeys.listItems(listId)
   const mutationKey = ['item-action', listId]
@@ -523,19 +591,36 @@ function useItemAction(listId: string) {
       // Cancelling happens synchronously; not awaiting it lets the new value
       // paint on the same frame as the tap.
       void queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<api.ListItem[]>(queryKey)
-      queryClient.setQueryData<api.ListItem[]>(queryKey, (items) =>
-        items?.flatMap((item) => {
-          if (item.id !== action.itemId) return [item]
+      const items = queryClient.getQueryData<api.ListItem[]>(queryKey) ?? []
+      const index = items.findIndex((item) => item.id === action.item.id)
+      const previous = items[index]
+      queryClient.setQueryData<api.ListItem[]>(queryKey, (current) =>
+        current?.flatMap((item) => {
+          if (item.id !== action.item.id) return [item]
           const next = action.optimistic(item)
           return next ? [next] : []
         }),
       )
-      return { previous }
+      return { previous, index }
     },
-    onError: (_error, _action, context) => {
-      if (context?.previous) queryClient.setQueryData(queryKey, context.previous)
+    // These callbacks belong to the mutation itself, so they still run after
+    // the row that started it has unmounted.
+    onError: (error, action, context) => {
+      const previous = context?.previous
+      if (previous) {
+        queryClient.setQueryData<api.ListItem[]>(queryKey, (current = []) => {
+          // Restore by id; the saved index only places an item that was removed.
+          if (current.some((item) => item.id === previous.id)) {
+            return current.map((item) => (item.id === previous.id ? previous : item))
+          }
+          const restored = [...current]
+          restored.splice(Math.min(context.index, restored.length), 0, previous)
+          return restored
+        })
+      }
+      onOutcome(action.item, error)
     },
+    onSuccess: (_result, action) => onOutcome(action.item, null),
     onSettled: () => {
       if (queryClient.isMutating({ mutationKey }) <= 1) {
         return queryClient.invalidateQueries({ queryKey })
@@ -606,7 +691,9 @@ function SearchIcon() {
 }
 
 type ItemAction = {
-  itemId: string
+  item: api.ListItem
   run: () => Promise<unknown>
   optimistic: (item: api.ListItem) => api.ListItem | null
 }
+
+type OutcomeHandler = (item: api.ListItem, error: unknown) => void

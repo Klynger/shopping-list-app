@@ -10,8 +10,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('checking')
   const [username, setUsername] = useState(readStoredUsername)
   const [checkCount, setCheckCount] = useState(0)
+  const [sessionExpired, setSessionExpired] = useState(false)
 
-  const endSession = useCallback(() => {
+  const endSession = useCallback((reason: 'expired' | 'logout') => {
+    setSessionExpired(reason === 'expired')
     setStatus('anonymous')
     storeUsername(null)
     setUsername(null)
@@ -19,7 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient])
 
   useEffect(() => {
-    setUnauthorizedHandler(endSession)
+    setUnauthorizedHandler(() => endSession('expired'))
     return () => setUnauthorizedHandler(null)
   }, [endSession])
 
@@ -39,7 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch((error: unknown) => {
         if (cancelled) return
-        setStatus(error instanceof ApiError ? 'anonymous' : 'unreachable')
+        // Only a 401 means "not logged in". With the API down, the dev proxy
+        // answers 502, and a 5xx is a server fault; neither should log anyone out.
+        setStatus(error instanceof ApiError && error.status === 401 ? 'anonymous' : 'unreachable')
       })
 
     return () => {
@@ -53,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear()
       storeUsername(response.username)
       setUsername(response.username)
+      setSessionExpired(false)
       setStatus('authenticated')
     },
     [queryClient],
@@ -62,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.logout()
     } finally {
-      endSession()
+      endSession('logout')
     }
   }, [endSession])
 
@@ -72,8 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ status, username, login, logout, recheck }),
-    [status, username, login, logout, recheck],
+    () => ({ status, sessionExpired, username, login, logout, recheck }),
+    [status, sessionExpired, username, login, logout, recheck],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

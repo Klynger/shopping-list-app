@@ -6,6 +6,11 @@ export type AuthStatus = 'checking' | 'authenticated' | 'anonymous' | 'unreachab
 
 export type AuthContextValue = {
   status: AuthStatus
+  /**
+   * True when the session ended on its own (a 401), as opposed to the user
+   * logging out. Only then is returning to the previous page useful.
+   */
+  sessionExpired: boolean
   username: string | null
   login: (form: api.LoginForm) => Promise<void>
   logout: () => Promise<void>

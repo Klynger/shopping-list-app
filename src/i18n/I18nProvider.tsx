@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { ApiError } from '../api/client.ts'
-import { messages, type Locale, type Messages } from './messages.ts'
+import { messages, type ApiErrorCode, type Locale, type Messages } from './messages.ts'
 import { I18nContext } from './useI18n.ts'
 
 export function I18nProvider({ children }: { children: ReactNode }) {
@@ -49,8 +49,8 @@ function initialLocale(): Locale {
  */
 function translateError(error: unknown, t: Messages) {
   if (error instanceof ApiError) {
-    const known = t.errors.codes[error.code]
-    if (known) return known
+    // Own keys only, so a code like "constructor" cannot hit Object.prototype.
+    if (Object.hasOwn(t.errors.codes, error.code)) return t.errors.codes[error.code as ApiErrorCode]
     if (error.status === 422 || error.status === 400) return t.errors.validation
     return t.errors.generic
   }

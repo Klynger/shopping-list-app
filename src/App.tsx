@@ -53,13 +53,15 @@ function AnonymousOnly() {
 }
 
 function RequireAuth() {
-  const { status } = useAuth()
+  const { status, sessionExpired } = useAuth()
   const location = useLocation()
 
   if (status === 'checking') return <FullPageLoading />
   if (status === 'unreachable') return <Unreachable />
   if (status === 'anonymous') {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    // After a deliberate logout the next person to log in may be someone else,
+    // so only an expired session sends them back to where they were.
+    return <Navigate to="/login" replace state={sessionExpired ? { from: location.pathname } : undefined} />
   }
 
   return <Outlet />

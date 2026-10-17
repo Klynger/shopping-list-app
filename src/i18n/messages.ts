@@ -1,5 +1,29 @@
 export type Locale = 'en' | 'pt-BR'
 
+/**
+ * Error codes the API can return that have their own message. Both dictionaries
+ * must cover every one; any other code falls back to a generic message.
+ */
+export type ApiErrorCode =
+  | 'INVALID_CREDENTIALS'
+  | 'USERNAME_TAKEN'
+  | 'USER_NOT_FOUND'
+  | 'GROUP_NOT_FOUND'
+  | 'INVITE_NOT_FOUND'
+  | 'LIST_NOT_FOUND'
+  | 'ITEM_NOT_FOUND'
+  | 'PRODUCT_NOT_FOUND'
+  | 'INVITE_SELF'
+  | 'ALREADY_MEMBER'
+  | 'ALREADY_INVITED'
+  | 'INSUFFICIENT_PERMISSIONS'
+  | 'NOT_A_MEMBER'
+  | 'ITEM_ALREADY_ON_LIST'
+  | 'QUANTITY_BELOW_MINIMUM'
+  | 'RATE_LIMITED'
+  | 'UNAUTHORIZED'
+  | 'DUPLICATE_ENTRY'
+
 export const locales: { value: Locale; label: string }[] = [
   { value: 'en', label: 'English' },
   { value: 'pt-BR', label: 'Português (Brasil)' },
@@ -13,6 +37,7 @@ const en = {
     language: 'Language',
     owner: 'Owner',
     you: '(you)',
+    dismiss: 'Dismiss',
   },
   app: {
     name: 'Shopping List',
@@ -95,7 +120,6 @@ const en = {
     added: 'Added',
     createAndAdd: (name: string) => `Add “${name}” as a new product`,
     noProducts: 'No products yet. Type a name to create the first one.',
-    noMatches: 'No products match.',
     closeSheet: 'Done',
   },
   listStatus: {
@@ -132,7 +156,7 @@ const en = {
       RATE_LIMITED: 'Too many attempts. Wait a moment and try again.',
       UNAUTHORIZED: 'Your session ended. Log in again.',
       DUPLICATE_ENTRY: 'That already exists.',
-    } as Partial<Record<string, string>>,
+    } satisfies Record<ApiErrorCode, string> as Record<ApiErrorCode, string>,
   },
 }
 
@@ -146,6 +170,7 @@ const ptBR: Messages = {
     language: 'Idioma',
     owner: 'Dono',
     you: '(você)',
+    dismiss: 'Fechar',
   },
   app: {
     name: 'Lista de Compras',
@@ -228,7 +253,6 @@ const ptBR: Messages = {
     added: 'Adicionado',
     createAndAdd: (name: string) => `Adicionar “${name}” como novo produto`,
     noProducts: 'Nenhum produto ainda. Digite um nome para criar o primeiro.',
-    noMatches: 'Nenhum produto encontrado.',
     closeSheet: 'Pronto',
   },
   listStatus: {
