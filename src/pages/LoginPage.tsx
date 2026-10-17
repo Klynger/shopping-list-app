@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation } from 'react-router'
+import { useIntl } from 'react-intl'
 
 import { useAuth } from '../auth/useAuth.ts'
 import { Button, ErrorText, TextField } from '../components/ui.tsx'
-import { useI18n } from '../i18n/useI18n.ts'
+import { useFormatError } from '../i18n/useFormatError.ts'
 
 export function LoginPage() {
   const { login } = useAuth()
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const location = useLocation()
   const justRegistered = (location.state as { registered?: string } | null)?.registered
   const [username, setUsername] = useState(justRegistered ?? '')
@@ -30,11 +32,11 @@ export function LoginPage() {
   return (
     <div className="center-page">
       <form className="card auth-card" onSubmit={handleSubmit}>
-        <h1>{t.auth.loginTitle}</h1>
-        {justRegistered ? <p className="success-text">{t.auth.accountCreated}</p> : null}
-        <TextField label={t.auth.username} value={username} onChange={setUsername} autoComplete="username" required autoFocus />
+        <h1>{formatMessage({ id: 'auth.login.title' })}</h1>
+        {justRegistered ? <p className="success-text">{formatMessage({ id: 'auth.accountCreated' })}</p> : null}
+        <TextField label={formatMessage({ id: 'auth.username' })} value={username} onChange={setUsername} autoComplete="username" required autoFocus />
         <TextField
-          label={t.auth.password}
+          label={formatMessage({ id: 'auth.password' })}
           type="password"
           value={password}
           onChange={setPassword}
@@ -43,10 +45,10 @@ export function LoginPage() {
         />
         <ErrorText error={error} />
         <Button type="submit" disabled={pending}>
-          {pending ? t.auth.loggingIn : t.auth.loginSubmit}
+          {pending ? formatMessage({ id: 'auth.loggingIn' }) : formatMessage({ id: 'auth.login.submit' })}
         </Button>
         <p className="muted auth-switch">
-          {t.auth.newHere} <Link to="/register">{t.auth.createAccountLink}</Link>
+          {formatMessage({ id: 'auth.newHere' })} <Link to="/register">{formatMessage({ id: 'auth.createAccountLink' })}</Link>
         </p>
       </form>
     </div>

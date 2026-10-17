@@ -33,6 +33,8 @@ The pnpm version is pinned in `package.json` (`packageManager`). With [Volta](ht
 
 ## Translations
 
-All UI text lives in `src/i18n/messages.ts`. The Portuguese dictionary is typed against the English one, so a missing or renamed key fails the build. The language follows the browser on first visit and can be changed from the header, and the choice is remembered on the device.
+Text lives in `src/locales/<locale>.json` (`en.json`, `pt-br.json`): flat, dot-separated keys in [ICU message format](https://formatjs.github.io/docs/core-concepts/icu-syntax), rendered with [react-intl](https://formatjs.github.io/docs/react-intl). Components read text with `useIntl().formatMessage({ id: 'list.addItems' })`, and values go in the second argument (`{ name }`, `{ count }` for plurals). Note that ICU treats a plain `'` as an escape character, so use the typographic `’` in copy.
 
-API error text is English only, so errors are translated from their stable `code` (see `errors.codes` in the messages file), with a generic fallback for codes that have no message yet.
+Message ids are type-checked against `en.json`, so a mistyped id fails the build, and `src/typings/intl.ts` fails it too when `pt-br.json` is missing a key or has an extra one. Each locale file loads lazily on top of English, so an untranslated key falls back to English text.
+
+The language follows the browser on first visit and can be changed from the header; the choice is remembered on the device. API error text is English only, so errors are translated from their stable `code` (`error.code.<CODE>`), with a generic fallback for codes that have no message.

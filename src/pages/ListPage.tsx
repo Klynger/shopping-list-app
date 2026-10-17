@@ -2,24 +2,25 @@ import { Menu } from '@base-ui/react/menu'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
+import { useIntl } from 'react-intl'
 
 import * as api from '../api/endpoints.ts'
 import { Button, EmptyState, ErrorText, Loading, Modal, Select, TextField } from '../components/ui.tsx'
-import { useI18n } from '../i18n/useI18n.ts'
+import { useFormatError } from '../i18n/useFormatError.ts'
 
 export function ListPage() {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
   const { groupId = '', listId = '' } = useParams()
   const groups = useQuery({ queryKey: api.queryKeys.groups, queryFn: api.listGroups })
   const lists = useQuery({ queryKey: api.queryKeys.groupLists(groupId), queryFn: () => api.listGroupLists(groupId) })
   const group = groups.data?.find((candidate) => candidate.groupId === groupId)
   const list = lists.data?.find((candidate) => candidate.id === listId)
 
-  if (lists.isPending) return <Loading label={t.common.loading} />
+  if (lists.isPending) return <Loading label={formatMessage({ id: 'common.loading' })} />
 
   const backLink = (
     <Link to={`/groups/${groupId}`} className="back-link">
-      ‹ {group?.groupName ?? t.list.groupFallback}
+      ‹ {group?.groupName ?? formatMessage({ id: 'list.groupFallback' })}
     </Link>
   )
 
@@ -27,7 +28,7 @@ export function ListPage() {
     return (
       <div className="page">
         {backLink}
-        <EmptyState>{t.list.notFound}</EmptyState>
+        <EmptyState>{formatMessage({ id: 'list.notFound' })}</EmptyState>
       </div>
     )
   }
@@ -42,19 +43,20 @@ export function ListPage() {
 }
 
 function ListHeader({ list }: { list: api.ShoppingList }) {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const queryClient = useQueryClient()
   const updateStatus = useMutation({
     mutationFn: (status: api.ListStatus) => api.updateListStatus(list.id, status),
     onSettled: () => queryClient.invalidateQueries({ queryKey: api.queryKeys.groupLists(list.groupId) }),
   })
-  const options = listStatuses.map((status) => ({ value: status, label: t.listStatus[status] }))
+  const options = listStatuses.map((status) => ({ value: status, label: formatMessage({ id: `listStatus.${status}` }) }))
 
   return (
     <div className="list-header">
       <h1 className="page-title">{list.name}</h1>
       <Select
-        label={t.list.statusLabel}
+        label={formatMessage({ id: 'list.statusLabel' })}
         hideLabel
         size="sm"
         value={updateStatus.isPending ? updateStatus.variables : list.status}
@@ -67,7 +69,8 @@ function ListHeader({ list }: { list: api.ShoppingList }) {
 }
 
 function Items({ listId }: { listId: string }) {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const items = useQuery({ queryKey: api.queryKeys.listItems(listId), queryFn: () => api.listItems(listId) })
   const products = useQuery({ queryKey: api.queryKeys.products, queryFn: api.listProducts })
   const [adding, setAdding] = useState(false)
@@ -94,19 +97,19 @@ function Items({ listId }: { listId: string }) {
     <>
       <section className="section">
         <h2>
-          {t.list.remaining} <span className="count">{remaining.length}</span>
+          {formatMessage({ id: 'list.remaining' })} <span className="count">{remaining.length}</span>
         </h2>
-        {items.isPending ? <Loading label={t.common.loading} /> : null}
+        {items.isPending ? <Loading label={formatMessage({ id: 'common.loading' })} /> : null}
         <ErrorText error={items.error ? formatError(items.error) : null} />
-        {items.data && items.data.length === 0 ? <EmptyState>{t.list.empty}</EmptyState> : null}
-        {items.data && items.data.length > 0 && remaining.length === 0 ? <EmptyState>{t.list.allDone}</EmptyState> : null}
+        {items.data && items.data.length === 0 ? <EmptyState>{formatMessage({ id: 'list.empty' })}</EmptyState> : null}
+        {items.data && items.data.length > 0 && remaining.length === 0 ? <EmptyState>{formatMessage({ id: 'list.allDone' })}</EmptyState> : null}
         <ItemList listId={listId} items={remaining} productUnits={productUnits} onOutcome={reportOutcome} />
       </section>
 
       {done.length > 0 ? (
         <section className="section">
           <h2>
-            {t.list.done} <span className="count">{done.length}</span>
+            {formatMessage({ id: 'list.done' })} <span className="count">{done.length}</span>
           </h2>
           <ItemList listId={listId} items={done} productUnits={productUnits} onOutcome={reportOutcome} />
         </section>
@@ -117,13 +120,13 @@ function Items({ listId }: { listId: string }) {
           <div className="action-error" role="alert">
             <span>{failure.message}</span>
             <Button variant="ghost" size="sm" onClick={() => setFailure(null)}>
-              {t.common.dismiss}
+              {formatMessage({ id: 'common.dismiss' })}
             </Button>
           </div>
         ) : null}
         <Button className="bottom-bar-button" onClick={() => setAdding(true)}>
           <PlusIcon />
-          {t.list.addItems}
+          {formatMessage({ id: 'list.addItems' })}
         </Button>
       </div>
 
@@ -177,7 +180,7 @@ function ItemRow({
   unit: string
   onOutcome: OutcomeHandler
 }) {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
   const action = useItemAction(listId, onOutcome)
   const [editing, setEditing] = useState(false)
   const isBought = item.status === 'purchased'
@@ -197,7 +200,7 @@ function ItemRow({
         type="button"
         className="item-check"
         aria-pressed={isBought}
-        aria-label={isBought ? t.list.markNotBought(item.productName) : t.list.markBought(item.productName)}
+        aria-label={isBought ? formatMessage({ id: 'list.item.markNotBought' }, { name: item.productName }) : formatMessage({ id: 'list.item.markBought' }, { name: item.productName })}
         onClick={() => setStatus(isBought ? 'pending' : 'purchased')}
       >
         <span className="item-check-circle">{isBought ? <CheckIcon size={14} /> : null}</span>
@@ -207,17 +210,17 @@ function ItemRow({
         <span className="item-name">{item.productName}</span>
         {item.note || showStatus ? (
           <span className="item-meta">
-            {showStatus ? <span className={`badge badge-item-${item.status}`}>{t.itemStatus[item.status]}</span> : null}
+            {showStatus ? <span className={`badge badge-item-${item.status}`}>{formatMessage({ id: `itemStatus.${item.status}` })}</span> : null}
             {item.note ? <span className="item-note">{item.note}</span> : null}
           </span>
         ) : null}
       </div>
 
-      <div className="stepper" role="group" aria-label={t.list.quantityOf(item.productName)}>
+      <div className="stepper" role="group" aria-label={formatMessage({ id: 'list.item.quantityOf' }, { name: item.productName })}>
         <button
           type="button"
           className="stepper-button"
-          aria-label={t.list.decrease}
+          aria-label={formatMessage({ id: 'list.item.decrease' })}
           disabled={item.quantity <= 1}
           onClick={() =>
             action.mutate({
@@ -236,7 +239,7 @@ function ItemRow({
         <button
           type="button"
           className="stepper-button"
-          aria-label={t.list.increase}
+          aria-label={formatMessage({ id: 'list.item.increase' })}
           onClick={() =>
             action.mutate({
               item,
@@ -272,18 +275,18 @@ function ItemMenu({
   onEdit: () => void
   onRemove: () => void
 }) {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   return (
     <Menu.Root>
-      <Menu.Trigger className="icon-button" aria-label={t.list.itemActions(item.productName)}>
+      <Menu.Trigger className="icon-button" aria-label={formatMessage({ id: 'list.item.actions' }, { name: item.productName })}>
         <MoreIcon />
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Positioner className="menu-positioner" align="end" sideOffset={4}>
           <Menu.Popup className="menu-popup">
             <Menu.Group>
-              <Menu.GroupLabel className="menu-group-label">{t.list.status}</Menu.GroupLabel>
+              <Menu.GroupLabel className="menu-group-label">{formatMessage({ id: 'list.item.status' })}</Menu.GroupLabel>
               <Menu.RadioGroup
                 value={item.status}
                 onValueChange={(status: api.ItemStatus) => {
@@ -295,7 +298,7 @@ function ItemMenu({
                     <Menu.RadioItemIndicator className="menu-indicator" keepMounted>
                       <CheckIcon size={12} />
                     </Menu.RadioItemIndicator>
-                    <span>{t.itemStatus[status]}</span>
+                    <span>{formatMessage({ id: `itemStatus.${status}` })}</span>
                   </Menu.RadioItem>
                 ))}
               </Menu.RadioGroup>
@@ -303,11 +306,11 @@ function ItemMenu({
             <div className="menu-separator" role="separator" />
             <Menu.Item className="menu-item" onClick={onEdit}>
               <span className="menu-indicator" />
-              <span>{t.list.editDetails}</span>
+              <span>{formatMessage({ id: 'list.item.editDetails' })}</span>
             </Menu.Item>
             <Menu.Item className="menu-item menu-item-danger" onClick={onRemove}>
               <span className="menu-indicator" />
-              <span>{t.list.remove}</span>
+              <span>{formatMessage({ id: 'list.item.remove' })}</span>
             </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
@@ -327,19 +330,20 @@ function EditItemModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   // The popup unmounts while closed, so the form inside starts fresh from the
   // item every time it opens.
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={t.list.editTitle(item.productName)}>
+    <Modal open={open} onOpenChange={onOpenChange} title={formatMessage({ id: 'list.edit.title' }, { name: item.productName })}>
       <EditItemForm listId={listId} item={item} onDone={() => onOpenChange(false)} />
     </Modal>
   )
 }
 
 function EditItemForm({ listId, item, onDone }: { listId: string; item: api.ListItem; onDone: () => void }) {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const queryClient = useQueryClient()
   const [initial] = useState(item)
   const [quantity, setQuantity] = useState(String(item.quantity))
@@ -372,17 +376,17 @@ function EditItemForm({ listId, item, onDone }: { listId: string; item: api.List
   return (
     <form className="stack" onSubmit={handleSubmit}>
       <div className="field-row">
-        <TextField label={t.list.quantity} type="number" min={1} value={quantity} onChange={setQuantity} required />
-        <TextField label={t.list.unit} placeholder={t.list.unitPlaceholder} value={unit} onChange={setUnit} />
+        <TextField label={formatMessage({ id: 'list.edit.quantity' })} type="number" min={1} value={quantity} onChange={setQuantity} required />
+        <TextField label={formatMessage({ id: 'list.edit.unit' })} placeholder={formatMessage({ id: 'list.edit.unitPlaceholder' })} value={unit} onChange={setUnit} />
       </div>
-      <TextField label={t.list.note} placeholder={t.list.notePlaceholder} value={note} onChange={setNote} />
+      <TextField label={formatMessage({ id: 'list.edit.note' })} placeholder={formatMessage({ id: 'list.edit.notePlaceholder' })} value={note} onChange={setNote} />
       <ErrorText error={save.error ? formatError(save.error) : null} />
       <div className="dialog-actions">
         <Button type="button" variant="secondary" onClick={onDone}>
-          {t.common.cancel}
+          {formatMessage({ id: 'common.cancel' })}
         </Button>
         <Button type="submit" disabled={save.isPending || Number(quantity) < 1}>
-          {t.common.save}
+          {formatMessage({ id: 'common.save' })}
         </Button>
       </div>
     </form>
@@ -406,12 +410,12 @@ function AddItemsSheet({
   items: api.ListItem[]
   products: api.Product[]
 }) {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   // Like the edit form, the panel mounts on each open, so the search and any
   // earlier error start clear.
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={t.list.sheetTitle} className="sheet-tall">
+    <Modal open={open} onOpenChange={onOpenChange} title={formatMessage({ id: 'list.sheet.title' })} className="sheet-tall">
       <AddItemsPanel listId={listId} items={items} products={products} onClose={() => onOpenChange(false)} />
     </Modal>
   )
@@ -428,7 +432,8 @@ function AddItemsPanel({
   products: api.Product[]
   onClose: () => void
 }) {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
@@ -496,7 +501,7 @@ function AddItemsPanel({
     <>
       <form className="sheet-search" onSubmit={handleSubmit}>
         <label className="visually-hidden" htmlFor="add-items-search">
-          {t.list.searchLabel}
+          {formatMessage({ id: 'list.sheet.searchLabel' })}
         </label>
         <SearchIcon />
         <input
@@ -506,7 +511,7 @@ function AddItemsPanel({
           type="search"
           enterKeyHint="go"
           autoComplete="off"
-          placeholder={t.list.searchPlaceholder}
+          placeholder={formatMessage({ id: 'list.sheet.searchPlaceholder' })}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
@@ -534,7 +539,7 @@ function AddItemsPanel({
                 </span>
                 {alreadyOnList ? (
                   <span className={justAdded === product.id ? 'product-result-state added' : 'product-result-state'}>
-                    {justAdded === product.id ? t.list.added : t.list.onList}
+                    {justAdded === product.id ? formatMessage({ id: 'list.sheet.added' }) : formatMessage({ id: 'list.sheet.onList' })}
                   </span>
                 ) : (
                   <span className="product-result-add" aria-hidden="true">
@@ -554,17 +559,17 @@ function AddItemsPanel({
               onClick={() => add.mutate({ newProductName: trimmed })}
             >
               <PlusIcon />
-              <span>{t.list.createAndAdd(trimmed)}</span>
+              <span>{formatMessage({ id: 'list.sheet.createAndAdd' }, { name: trimmed })}</span>
             </button>
           </li>
         ) : null}
       </ul>
 
-      {products.length === 0 && !trimmed ? <EmptyState>{t.list.noProducts}</EmptyState> : null}
+      {products.length === 0 && !trimmed ? <EmptyState>{formatMessage({ id: 'list.sheet.noProducts' })}</EmptyState> : null}
 
       <div className="dialog-actions">
         <Button variant="secondary" onClick={onClose}>
-          {t.list.closeSheet}
+          {formatMessage({ id: 'list.sheet.close' })}
         </Button>
       </div>
     </>

@@ -1,10 +1,12 @@
 import { Select } from '@base-ui/react/select'
+import { useIntl } from 'react-intl'
 
-import { locales, type Locale } from '../i18n/messages.ts'
+import { locales, type Locale } from '../i18n/locales.ts'
 import { useI18n } from '../i18n/useI18n.ts'
 
 export function LanguageSwitcher() {
-  const { locale, setLocale, t } = useI18n()
+  const { locale, setLocale } = useI18n()
+  const { formatMessage } = useIntl()
 
   return (
     <Select.Root
@@ -14,7 +16,7 @@ export function LanguageSwitcher() {
         if (next) setLocale(next)
       }}
     >
-      <Select.Trigger className="select-trigger select-trigger-sm language-trigger" aria-label={t.common.language}>
+      <Select.Trigger className="select-trigger select-trigger-sm language-trigger" aria-label={formatMessage({ id: 'common.language' })}>
         <GlobeIcon />
         {/* The trigger stays short so it fits a phone header; the menu has full names. */}
         <Select.Value>{(value: Locale) => shortLabels[value]}</Select.Value>

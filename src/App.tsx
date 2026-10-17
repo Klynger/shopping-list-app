@@ -1,9 +1,9 @@
 import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
+import { useIntl } from 'react-intl'
 
 import { useAuth } from './auth/useAuth.ts'
 import { LanguageSwitcher } from './components/LanguageSwitcher.tsx'
 import { Button, Loading } from './components/ui.tsx'
-import { useI18n } from './i18n/useI18n.ts'
 import { GroupPage } from './pages/GroupPage.tsx'
 import { HomePage } from './pages/HomePage.tsx'
 import { ListPage } from './pages/ListPage.tsx'
@@ -69,20 +69,20 @@ function RequireAuth() {
 
 function AppLayout() {
   const { username, logout } = useAuth()
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <Link to="/" className="brand">
           <CartIcon />
-          <span>{t.app.name}</span>
+          <span>{formatMessage({ id: 'app.name' })}</span>
         </Link>
         <div className="app-header-actions">
           {username ? <span className="muted header-username">@{username}</span> : null}
           <LanguageSwitcher />
           <Button variant="ghost" size="sm" onClick={() => void logout()}>
-            {t.app.logout}
+            {formatMessage({ id: 'app.logout' })}
           </Button>
         </div>
       </header>
@@ -94,25 +94,25 @@ function AppLayout() {
 }
 
 function FullPageLoading() {
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   return (
     <div className="center-page">
-      <Loading label={t.common.loading} />
+      <Loading label={formatMessage({ id: 'common.loading' })} />
     </div>
   )
 }
 
 function Unreachable() {
   const { recheck } = useAuth()
-  const { t } = useI18n()
+  const { formatMessage } = useIntl()
 
   return (
     <div className="center-page">
       <div className="card auth-card">
-        <h1>{t.app.unreachableTitle}</h1>
-        <p className="muted">{t.app.unreachableBody}</p>
-        <Button onClick={recheck}>{t.app.tryAgain}</Button>
+        <h1>{formatMessage({ id: 'app.unreachable.title' })}</h1>
+        <p className="muted">{formatMessage({ id: 'app.unreachable.body' })}</p>
+        <Button onClick={recheck}>{formatMessage({ id: 'app.tryAgain' })}</Button>
       </div>
     </div>
   )

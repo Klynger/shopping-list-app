@@ -1,14 +1,16 @@
 import { createContext, use } from 'react'
 
-import type { Locale, Messages } from './messages.ts'
+import type { Locale } from './locales.ts'
 
 export type I18nContextValue = {
   locale: Locale
   setLocale: (locale: Locale) => void
-  t: Messages
-  formatError: (error: unknown) => string
 }
 
+/**
+ * The current language and a way to change it. Text itself comes from
+ * react-intl's `useIntl().formatMessage`.
+ */
 export function useI18n() {
   const value = use(I18nContext)
   if (!value) {

@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { IntlProvider, useIntl } from 'react-intl'
 
-import { ApiError } from '../api/client.ts'
-import { messages, type ApiErrorCode, type Locale, type Messages } from './messages.ts'
+import { fallbackLocale, loadMessages, type Locale, type Messages } from './locales.ts'
 import { I18nContext } from './useI18n.ts'
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(initialLocale)
-  const t = messages[locale]
+  const [loaded, setLoaded] = useState<{ locale: Locale; messages: Messages } | null>(null)
 
   useEffect(() => {
-    document.documentElement.lang = locale
-    document.title = t.app.name
-  }, [locale, t])
+    let cancelled = false
+    void loadMessages(locale).then((messages) => {
+      if (!cancelled) setLoaded({ locale, messages })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [locale])
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next)
@@ -22,11 +27,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const formatError = useCallback((error: unknown) => translateError(error, t), [t])
+  const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale])
 
-  const value = useMemo(() => ({ locale, setLocale, t, formatError }), [locale, setLocale, t, formatError])
+  // Nothing renders until the first locale file arrives. When switching, the
+  // previous language stays on screen until the new one has loaded.
+  if (!loaded) return null
 
-  return <I18nContext value={value}>{children}</I18nContext>
+  return (
+    <I18nContext value={value}>
+      <IntlProvider locale={loaded.locale} defaultLocale={fallbackLocale} messages={loaded.messages}>
+        <DocumentLanguage />
+        {children}
+      </IntlProvider>
+    </I18nContext>
+  )
 }
 
 const localeStorageKey = 'shopping-list.locale'
@@ -43,19 +57,13 @@ function initialLocale(): Locale {
   return preferred.some((language) => language.toLowerCase().startsWith('pt')) ? 'pt-BR' : 'en'
 }
 
-/**
- * Maps an API error to a message in the current language. The API's own
- * `detail` text is English only, so the stable `code` drives the translation.
- */
-function translateError(error: unknown, t: Messages) {
-  if (error instanceof ApiError) {
-    // Own keys only, so a code like "constructor" cannot hit Object.prototype.
-    if (Object.hasOwn(t.errors.codes, error.code)) return t.errors.codes[error.code as ApiErrorCode]
-    if (error.status === 422 || error.status === 400) return t.errors.validation
-    return t.errors.generic
-  }
+function DocumentLanguage() {
+  const intl = useIntl()
 
-  if (error instanceof TypeError) return t.errors.network
+  useEffect(() => {
+    document.documentElement.lang = intl.locale
+    document.title = intl.formatMessage({ id: 'app.name' })
+  }, [intl])
 
-  return t.errors.generic
+  return null
 }

@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useIntl } from 'react-intl'
 
 import * as api from '../api/endpoints.ts'
 import { Button, EmptyState, ErrorText, Loading, TextField } from '../components/ui.tsx'
-import { useI18n } from '../i18n/useI18n.ts'
+import { useFormatError } from '../i18n/useFormatError.ts'
 
 export function HomePage() {
   return (
@@ -16,7 +17,8 @@ export function HomePage() {
 }
 
 function PendingInvites() {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const queryClient = useQueryClient()
   const invites = useQuery({ queryKey: api.queryKeys.myInvites, queryFn: api.listMyInvites })
   const accept = useMutation({
@@ -31,21 +33,21 @@ function PendingInvites() {
 
   return (
     <section className="section">
-      <h2>{t.home.invites}</h2>
+      <h2>{formatMessage({ id: 'home.invites' })}</h2>
       <ErrorText error={invites.error ? formatError(invites.error) : null} />
       <ul className="stack">
         {invites.data?.map((invite) => (
           <li key={invite.id} className="card row invite-card">
             <div>
               <strong>{invite.groupName}</strong>
-              <p className="muted">{t.home.invitedBy(invite.senderUsername)}</p>
+              <p className="muted">{formatMessage({ id: 'home.invitedBy' }, { username: invite.senderUsername })}</p>
             </div>
             <Button
               size="sm"
               disabled={accept.isPending && accept.variables === invite.groupId}
               onClick={() => accept.mutate(invite.groupId)}
             >
-              {t.home.joinGroup}
+              {formatMessage({ id: 'home.joinGroup' })}
             </Button>
           </li>
         ))}
@@ -56,25 +58,26 @@ function PendingInvites() {
 }
 
 function GroupsSection() {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const groups = useQuery({ queryKey: api.queryKeys.groups, queryFn: api.listGroups })
 
   return (
     <section className="section">
       <div className="section-header">
-        <h2>{t.home.yourGroups}</h2>
+        <h2>{formatMessage({ id: 'home.yourGroups' })}</h2>
       </div>
-      {groups.isPending ? <Loading label={t.common.loading} /> : null}
+      {groups.isPending ? <Loading label={formatMessage({ id: 'common.loading' })} /> : null}
       <ErrorText error={groups.error ? formatError(groups.error) : null} />
       {groups.data && groups.data.length === 0 ? (
-        <EmptyState>{t.home.noGroups}</EmptyState>
+        <EmptyState>{formatMessage({ id: 'home.noGroups' })}</EmptyState>
       ) : null}
       <ul className="stack">
         {groups.data?.map((group) => (
           <li key={group.groupId}>
             <Link to={`/groups/${group.groupId}`} className="card card-link">
               <span className="card-link-title">{group.groupName}</span>
-              {group.roles.includes('owner') ? <span className="badge">{t.common.owner}</span> : null}
+              {group.roles.includes('owner') ? <span className="badge">{formatMessage({ id: 'common.owner' })}</span> : null}
               <span className="card-link-arrow" aria-hidden="true">
                 ›
               </span>
@@ -88,7 +91,8 @@ function GroupsSection() {
 }
 
 function CreateGroupForm() {
-  const { t, formatError } = useI18n()
+  const { formatMessage } = useIntl()
+  const formatError = useFormatError()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState('')
@@ -109,9 +113,9 @@ function CreateGroupForm() {
 
   return (
     <form className="inline-form" onSubmit={handleSubmit}>
-      <TextField label={t.home.newGroupLabel} hideLabel placeholder={t.home.newGroupPlaceholder} value={name} onChange={setName} />
+      <TextField label={formatMessage({ id: 'home.newGroup.label' })} hideLabel placeholder={formatMessage({ id: 'home.newGroup.placeholder' })} value={name} onChange={setName} />
       <Button type="submit" disabled={create.isPending || !name.trim()}>
-        {t.home.createGroup}
+        {formatMessage({ id: 'home.createGroup' })}
       </Button>
       <ErrorText error={create.error ? formatError(create.error) : null} />
     </form>
