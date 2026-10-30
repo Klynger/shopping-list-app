@@ -21,7 +21,15 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173. The dev server proxies `/v1` to the API, which keeps the session cookie same-origin (the API sends no CORS headers). Point it at another API with `API_URL=http://host:port pnpm dev`.
+Open http://localhost:5173. The dev server proxies `/v1` to the API, which keeps the session cookie same-origin (the API sends no CORS headers).
+
+The API address comes from `API_URL`. The committed `.env` points at `http://localhost:8080`, where `docker compose up` serves it. To point at another API, set it in `.env.local`, which Git ignores and which overrides `.env`. For example, the API running in the local k3d cluster:
+
+```bash
+echo 'API_URL=http://sl-api.localhost:8080' > .env.local
+```
+
+A variable set in the shell wins over both files, so `API_URL=http://host:port pnpm dev` still works for a single run.
 
 The pnpm version is pinned in `package.json` (`packageManager`). With [Volta](https://volta.sh), `volta install pnpm@<that version>` gets the right one.
 
