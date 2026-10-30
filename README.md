@@ -12,7 +12,7 @@ The app needs the API running. From the `sl-api` checkout:
 docker compose up --build
 ```
 
-That starts Postgres, runs migrations, serves the API on port 8080 and seeds test users (see `cmd/seed` in sl-api for their credentials).
+That starts Postgres, runs migrations, serves the API on port 8090 and seeds test users (see `cmd/seed` in sl-api for their credentials).
 
 Then, in this repo:
 
@@ -23,7 +23,7 @@ pnpm dev
 
 Open http://localhost:5173. The dev server proxies `/v1` to the API, which keeps the session cookie same-origin (the API sends no CORS headers).
 
-The API address comes from `API_URL`. The committed `.env` points at `http://localhost:8080`, where `docker compose up` serves it. To point at another API, set it in `.env.local`, which Git ignores and which overrides `.env`. For example, the API running in the local k3d cluster:
+The API address comes from `API_URL`. The committed `.env` points at `http://localhost:8090`, where `docker compose up` serves it. To point at another API, set it in `.env.local`, which Git ignores and which overrides `.env`. For example, the API running in the local k3d cluster:
 
 ```bash
 echo 'API_URL=http://sl-api.localhost:8080' > .env.local
